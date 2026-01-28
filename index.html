@@ -1,95 +1,135 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>旅遊分帳小工具</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
-    h1 { text-align: center; }
-    input, button { padding: 8px; margin: 5px 0; width: 100%; }
-    button { cursor: pointer; }
-    .row { display: flex; gap: 10px; }
-    .row input { flex: 1; }
-    ul { padding-left: 20px; }
-    .result { background: #f4f4f4; padding: 10px; margin-top: 15px; }
-  </style>
+<meta charset="UTF-8">
+<title>旅遊分帳工具</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {
+    font-family: system-ui, -apple-system;
+    background: linear-gradient(180deg, #e0f7fa, #ffffff);
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { text-align: center; }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 10px rgba(0,0,0,.08);
+  }
+  input, button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+  }
+  button {
+    background: #26c6da;
+    color: #fff;
+    border: none;
+    font-weight: bold;
+  }
+  button.secondary {
+    background: #ccc;
+    color: #333;
+  }
+  .people label {
+    display: block;
+  }
+</style>
 </head>
+
 <body>
 
-<h1>旅遊分帳小工具</h1>
-<p>每個人輸入「自己代付的總金額」，系統會自動幫你算好要互相付多少錢。</p>
+<h1>🌴 旅遊分帳小工具</h1>
+<p style="text-align:center">先設定旅伴 → 再輸入每筆代墊</p>
 
-<div class="row">
-  <input id="name" placeholder="旅伴名字">
-  <input id="amount" type="number" placeholder="代付金額">
+<div class="card">
+  <h3>👥 旅伴設定</h3>
+  <input id="peopleInput" placeholder="輸入旅伴，用逗號分隔（例：甲,乙,丙,丁）">
+  <button onclick="setPeople()">儲存旅伴</button>
 </div>
 
-<button onclick="addExpense()">新增這筆</button>
-<button onclick="calculate()">計算分帳結果</button>
-<button onclick="resetAll()">清空全部</button>
+<div class="card">
+  <h3>💸 新增花費</h3>
+  <input id="payer" placeholder="代墊者名字">
+  <input id="amount" type="number" placeholder="金額">
+  <div id="sharePeople" class="people"></div>
+  <button onclick="addExpense()">新增這筆</button>
+</div>
 
-<h3>已輸入名單</h3>
-<ul id="list"></ul>
+<div class="card">
+  <h3>📊 結算結果</h3>
+  <div id="result"></div>
+</div>
 
-<div id="summary" class="result"></div>
-<div id="result" class="result"></div>
+<button class="secondary" onclick="resetAll()">🗑 清空全部資料</button>
 
 <script>
-  const data = {};
+let people = JSON.parse(localStorage.getItem('people')) || [];
+let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
 
-  function addExpense() {
-    const name = document.getElementById('name').value.trim();
-    const amount = Number(document.getElementById('amount').value);
+renderPeople();
+calculate();
 
-    if (!name || amount <= 0) {
-      alert('請輸入有效的名字與金額');
-      return;
-    }
+function setPeople() {
+  const input = document.getElementById('peopleInput').value;
+  people = input.split(',').map(p => p.trim()).filter(Boolean);
+  localStorage.setItem('people', JSON.stringify(people));
+  renderPeople();
+}
 
-    if (data[name] !== undefined) {
-      alert('這個名字已經輸入過了');
-      return;
-    }
+function renderPeople() {
+  const div = document.getElementById('sharePeople');
+  div.innerHTML = '<p>這筆要分攤的人：</p>';
+  people.forEach(p => {
+    div.innerHTML += `<label><input type="checkbox" value="${p}" checked> ${p}</label>`;
+  });
+}
 
-    data[name] = amount;
-    document.getElementById('list').innerHTML += `<li>${name}：${amount} 元</li>`;
-    document.getElementById('name').value = '';
-    document.getElementById('amount').value = '';
+function addExpense() {
+  const payer = document.getElementById('payer').value.trim();
+  const amount = Number(document.getElementById('amount').value);
+  const shares = [...document.querySelectorAll('#sharePeople input:checked')].map(c => c.value);
+
+  if (!payer || amount <= 0 || shares.length === 0) {
+    alert('資料不完整');
+    return;
   }
 
-  function calculate() {
-    const names = Object.keys(data);
-    if (names.length === 0) return;
+  expenses.push({ payer, amount, shares });
+  localStorage.setItem('expenses', JSON.stringify(expenses));
+  calculate();
+}
 
-    const total = Object.values(data).reduce((a, b) => a + b, 0);
-    const avg = total / names.length;
+function calculate() {
+  const balance = {};
+  people.forEach(p => balance[p] = 0);
 
-    document.getElementById('summary').innerHTML =
-      `總花費：${total.toFixed(0)} 元<br>平均每人：${avg.toFixed(0)} 元`;
+  expenses.forEach(e => {
+    const per = e.amount / e.shares.length;
+    e.shares.forEach(p => balance[p] -= per);
+    balance[e.payer] += e.amount;
+  });
 
-    let output = '';
-    names.forEach(name => {
-      const diff = data[name] - avg;
-      if (diff > 0) {
-        output += `${name} 應收 ${diff.toFixed(0)} 元<br>`;
-      } else if (diff < 0) {
-        output += `${name} 應付 ${(-diff).toFixed(0)} 元<br>`;
-      } else {
-        output += `${name} 剛好打平<br>`;
-      }
-    });
-
-    document.getElementById('result').innerHTML = output;
+  let output = '';
+  for (const p in balance) {
+    output += `${p}：${balance[p].toFixed(0)} 元<br>`;
   }
+  document.getElementById('result').innerHTML = output;
+}
 
-  function resetAll() {
-    if (!confirm('確定要清空所有資料嗎？')) return;
-    Object.keys(data).forEach(k => delete data[k]);
-    document.getElementById('list').innerHTML = '';
-    document.getElementById('summary').innerHTML = '';
-    document.getElementById('result').innerHTML = '';
-  }
+function resetAll() {
+  if (!confirm('確定要清空所有資料？')) return;
+  localStorage.clear();
+  people = [];
+  expenses = [];
+  document.getElementById('result').innerHTML = '';
+  document.getElementById('sharePeople').innerHTML = '';
+}
 </script>
 
 </body>
