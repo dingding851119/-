@@ -2,70 +2,94 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>旅遊分帳工具</title>
+  <title>旅遊分帳小工具</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: sans-serif; max-width: 500px; margin: auto; }
-    input { margin: 4px 0; width: 100%; padding: 6px; }
-    button { margin-top: 8px; padding: 8px; width: 100%; }
-    .result { margin-top: 16px; }
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
+    h1 { text-align: center; }
+    input, button { padding: 8px; margin: 5px 0; width: 100%; }
+    button { cursor: pointer; }
+    .row { display: flex; gap: 10px; }
+    .row input { flex: 1; }
+    ul { padding-left: 20px; }
+    .result { background: #f4f4f4; padding: 10px; margin-top: 15px; }
   </style>
 </head>
 <body>
 
-<h2>旅遊分帳工具</h2>
+<h1>旅遊分帳小工具</h1>
+<p>每個人輸入「自己代付的總金額」，系統會自動幫你算好要互相付多少錢。</p>
 
-<div id="inputs"></div>
+<div class="row">
+  <input id="name" placeholder="旅伴名字">
+  <input id="amount" type="number" placeholder="代付金額">
+</div>
 
-<button onclick="addRow()">➕ 新增旅伴</button>
-<button onclick="calculate()">🧮 計算分帳</button>
+<button onclick="addExpense()">新增這筆</button>
+<button onclick="calculate()">計算分帳結果</button>
+<button onclick="resetAll()">清空全部</button>
 
-<div class="result" id="result"></div>
+<h3>已輸入名單</h3>
+<ul id="list"></ul>
+
+<div id="summary" class="result"></div>
+<div id="result" class="result"></div>
 
 <script>
-let people = [];
+  const data = {};
 
-function addRow() {
-  const index = people.length;
-  people.push({ name: "", paid: 0 });
+  function addExpense() {
+    const name = document.getElementById('name').value.trim();
+    const amount = Number(document.getElementById('amount').value);
 
-  const div = document.createElement("div");
-  div.innerHTML = `
-    <input placeholder="姓名" oninput="people[${index}].name=this.value">
-    <input type="number" placeholder="代付金額" oninput="people[${index}].paid=Number(this.value)">
-  `;
-  document.getElementById("inputs").appendChild(div);
-}
+    if (!name || amount <= 0) {
+      alert('請輸入有效的名字與金額');
+      return;
+    }
 
-function calculate() {
-  const resultDiv = document.getElementById("result");
-  resultDiv.innerHTML = "";
+    if (data[name] !== undefined) {
+      alert('這個名字已經輸入過了');
+      return;
+    }
 
-  const total = people.reduce((sum, p) => sum + p.paid, 0);
-  const avg = total / people.length;
+    data[name] = amount;
+    document.getElementById('list').innerHTML += `<li>${name}：${amount} 元</li>`;
+    document.getElementById('name').value = '';
+    document.getElementById('amount').value = '';
+  }
 
-  let creditors = [];
-  let debtors = [];
+  function calculate() {
+    const names = Object.keys(data);
+    if (names.length === 0) return;
 
-  people.forEach(p => {
-    const diff = p.paid - avg;
-    if (diff > 0) creditors.push({ name: p.name, amount: diff });
-    if (diff < 0) debtors.push({ name: p.name, amount: -diff });
-  });
+    const total = Object.values(data).reduce((a, b) => a + b, 0);
+    const avg = total / names.length;
 
-  creditors.forEach(c => {
-    debtors.forEach(d => {
-      if (c.amount > 0 && d.amount > 0) {
-        const pay = Math.min(c.amount, d.amount);
-        resultDiv.innerHTML += `<p>${d.name} → ${c.name}：${Math.round(pay)} 元</p>`;
-        c.amount -= pay;
-        d.amount -= pay;
+    document.getElementById('summary').innerHTML =
+      `總花費：${total.toFixed(0)} 元<br>平均每人：${avg.toFixed(0)} 元`;
+
+    let output = '';
+    names.forEach(name => {
+      const diff = data[name] - avg;
+      if (diff > 0) {
+        output += `${name} 應收 ${diff.toFixed(0)} 元<br>`;
+      } else if (diff < 0) {
+        output += `${name} 應付 ${(-diff).toFixed(0)} 元<br>`;
+      } else {
+        output += `${name} 剛好打平<br>`;
       }
     });
-  });
-}
 
-// 預設先給一個欄位
-addRow();
+    document.getElementById('result').innerHTML = output;
+  }
+
+  function resetAll() {
+    if (!confirm('確定要清空所有資料嗎？')) return;
+    Object.keys(data).forEach(k => delete data[k]);
+    document.getElementById('list').innerHTML = '';
+    document.getElementById('summary').innerHTML = '';
+    document.getElementById('result').innerHTML = '';
+  }
 </script>
 
 </body>
