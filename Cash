@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>旅遊分帳工具</title>
+  <style>
+    body { font-family: sans-serif; max-width: 500px; margin: auto; }
+    input { margin: 4px 0; width: 100%; padding: 6px; }
+    button { margin-top: 8px; padding: 8px; width: 100%; }
+    .result { margin-top: 16px; }
+  </style>
+</head>
+<body>
+
+<h2>旅遊分帳工具</h2>
+
+<div id="inputs"></div>
+
+<button onclick="addRow()">➕ 新增旅伴</button>
+<button onclick="calculate()">🧮 計算分帳</button>
+
+<div class="result" id="result"></div>
+
+<script>
+let people = [];
+
+function addRow() {
+  const index = people.length;
+  people.push({ name: "", paid: 0 });
+
+  const div = document.createElement("div");
+  div.innerHTML = `
+    <input placeholder="姓名" oninput="people[${index}].name=this.value">
+    <input type="number" placeholder="代付金額" oninput="people[${index}].paid=Number(this.value)">
+  `;
+  document.getElementById("inputs").appendChild(div);
+}
+
+function calculate() {
+  const resultDiv = document.getElementById("result");
+  resultDiv.innerHTML = "";
+
+  const total = people.reduce((sum, p) => sum + p.paid, 0);
+  const avg = total / people.length;
+
+  let creditors = [];
+  let debtors = [];
+
+  people.forEach(p => {
+    const diff = p.paid - avg;
+    if (diff > 0) creditors.push({ name: p.name, amount: diff });
+    if (diff < 0) debtors.push({ name: p.name, amount: -diff });
+  });
+
+  creditors.forEach(c => {
+    debtors.forEach(d => {
+      if (c.amount > 0 && d.amount > 0) {
+        const pay = Math.min(c.amount, d.amount);
+        resultDiv.innerHTML += `<p>${d.name} → ${c.name}：${Math.round(pay)} 元</p>`;
+        c.amount -= pay;
+        d.amount -= pay;
+      }
+    });
+  });
+}
+
+// 預設先給一個欄位
+addRow();
+</script>
+
+</body>
+</html>
